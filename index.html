@@ -26,7 +26,7 @@ function processProPresenterMessage(message) {
             var text = '';
 	
             // check slide note for noText keyword.  If noText is defined dont step into this IF
-            if (typeof message['ary'][2] !== 'undefined' && message['ary'][2]['txt'] !== config["noText"]) {
+            if (typeof message['ary'][1] !== 'undefined' && message['ary'][1]['txt'] !== config["noText"]) {
                 // replace carriage return \r and linefeed \n with <br> global
                 text = message['ary'][0]['txt'].replace(/\r\n|\n|\r/g, '<br />');
 	
