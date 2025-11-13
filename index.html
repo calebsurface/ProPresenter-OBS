@@ -57,12 +57,21 @@ function processProPresenterMessage(message) {
 
 
 function connectToProPresenter() {
+    // Choose connection method based on API type
+    if (config['api_type'] === 'openapi') {
+        connectToProPresenterOpenAPI();
+    } else {
+        connectToProPresenterStageDisplay();
+    }
+}
+
+function connectToProPresenterStageDisplay() {
     var proPresenterStageDisplayURL = 'ws://' + config['propresenter_ip'] + ':' + config['propresenter_port'] + '/stagedisplay';
     
     var ws = new WebSocket(proPresenterStageDisplayURL);
 
     ws.onopen = function() {
-        console.log('ProPresenter connection opened');
+        console.log('ProPresenter Stage Display connection opened');
         ws.send(JSON.stringify({
                                 "pwd": config['propresenter_password'],
                                 "ptl": 610,
@@ -75,16 +84,95 @@ function connectToProPresenter() {
     };
 
     ws.onclose = function(e) {
-        console.log('ProPresenter socket was closed. Attempting to reconnect in 1 second...', e.reason);
+        console.log('ProPresenter Stage Display socket was closed. Attempting to reconnect in 1 second...', e.reason);
         setTimeout(function() {
-            connectToProPresenter();
+            connectToProPresenterStageDisplay();
         }, 1000);
     };
 
     ws.onerror = function(err) {
-        console.error('ProPresenter socket has error: ', err.message, 'Closing socket');
+        console.error('ProPresenter Stage Display socket has error: ', err.message, 'Closing socket');
         ws.close();
     };
+}
+
+async function connectToProPresenterOpenAPI() {
+    var openAPIURL = 'http://' + config['propresenter_ip'] + ':' + config['propresenter_port'] + '/v1/status/updates';
+    
+    console.log('Connecting to ProPresenter OpenAPI:', openAPIURL);
+    
+    try {
+        const response = await fetch(openAPIURL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(['status/slide'])
+        });
+        
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        
+        console.log('ProPresenter OpenAPI connection established');
+        
+        // Read the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+            const {done, value} = await reader.read();
+            
+            if (done) {
+                console.log('ProPresenter OpenAPI stream ended. Reconnecting...');
+                setTimeout(connectToProPresenterOpenAPI, 1000);
+                break;
+            }
+            
+            // Decode the chunk and add to buffer
+            buffer += decoder.decode(value, {stream: true});
+            
+            // Process complete JSON lines
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+            
+            for (const line of lines) {
+                if (line.trim()) {
+                    try {
+                        const data = JSON.parse(line);
+                        
+                        // Convert OpenAPI format to Stage Display format
+                        if (data.url === 'status/slide' && data.data && data.data.current) {
+                            const slideData = data.data.current;
+                            
+                            // Create message in Stage Display format
+                            const stageDisplayMessage = {
+                                'acn': 'fv',
+                                'ary': [
+                                    {
+                                        'acn': 'cs',
+                                        'txt': slideData.text || ''
+                                    },
+                                    {
+                                        'txt': slideData.notes || ''
+                                    }
+                                ]
+                            };
+                            
+                            processProPresenterMessage(stageDisplayMessage);
+                        }
+                    } catch (err) {
+                        // Skip non-JSON lines
+                        console.debug('OpenAPI: Skipped line:', line.substring(0, 50));
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('ProPresenter OpenAPI connection error:', err.message, 'Retrying in 1 second...');
+        setTimeout(connectToProPresenterOpenAPI, 1000);
+    }
 }
 
 
