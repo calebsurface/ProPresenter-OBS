@@ -57,7 +57,12 @@ function processProPresenterMessage(message) {
 
 
 function connectToProPresenter() {
-    var proPresenterStageDisplayURL = 'ws://' + config['propresenter_ip'] + ':' + config['propresenter_port'] + '/stagedisplay';
+    var proPresenterStageDisplayURL;
+    if ('propresenter_hostname' in config) {
+        proPresenterStageDisplayURL = 'ws://' + config['propresenter_hostname'] + ':' + config['propresenter_port'] + '/stagedisplay';
+    } else {
+        proPresenterStageDisplayURL = 'ws://' + config['propresenter_ip'] + ':' + config['propresenter_port'] + '/stagedisplay';
+    }
     
     var ws = new WebSocket(proPresenterStageDisplayURL);
 

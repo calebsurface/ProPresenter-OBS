@@ -4,6 +4,7 @@ var config = {
 	//Enable under ProPresenter Preferences -> Network tab
 	//Enable Network and Stage Display App
 	'propresenter_ip' : '192.168.1.4',
+        //or instead of the above use  'propresenter_hostname': 'computername.local',
 	'propresenter_port' : 60157, //port from Network NOT Stage Display App
 	'propresenter_password' : 'av', //password from Stage Display App
 	'fade' : true,
